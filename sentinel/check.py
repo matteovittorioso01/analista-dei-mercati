@@ -70,13 +70,13 @@ def get_price(item):
 
 
 def send_telegram(text):
+    # Testo semplice (niente parse_mode): evita gli errori 400 di Telegram
+    # quando il testo contiene caratteri che la formattazione Markdown rifiuta.
     if not (TG_TOKEN and TG_CHAT):
         print("Telegram non configurato: salto invio.")
         return
     url = f"https://api.telegram.org/bot{TG_TOKEN}/sendMessage"
-    data = urllib.parse.urlencode(
-        {"chat_id": TG_CHAT, "text": text, "parse_mode": "Markdown"}
-    ).encode()
+    data = urllib.parse.urlencode({"chat_id": TG_CHAT, "text": text}).encode()
     try:
         urllib.request.urlopen(urllib.request.Request(url, data=data), timeout=20).read()
     except Exception as e:
@@ -264,11 +264,11 @@ def main():
         emoji = "🎯" if reason == "obiettivo" else "🛑"
         esito = "GUADAGNO" if realized >= 0 else "PERDITA"
         send_telegram(
-            f"{emoji} *SIMULAZIONE — VENDUTO {pos['symbol']}*\n"
+            f"{emoji} SIMULAZIONE — VENDUTO {pos['symbol']}\n"
             f"Prezzo: ${fmt(price)} (entrata ${fmt(pos['entry_price'])})\n"
             f"Risultato: {'+' if realized >= 0 else ''}{fmt(realized)} {cfg['currency']} "
             f"({'+' if pct >= 0 else ''}{pct:.1f}%) — {esito}\n"
-            f"Motivo: {reason}\n\n_⚠️ Soldi finti. Non è consulenza finanziaria._"
+            f"Motivo: {reason}\n\n⚠️ Soldi finti. Non è consulenza finanziaria."
         )
         dirty = True
     portfolio["open_positions"] = still_open
@@ -308,10 +308,10 @@ def main():
         stop_s = f"${fmt(pos['stop'])}" if pos["stop"] is not None else "—"
         tgt_s = f"${fmt(pos['target'])}" if pos["target"] is not None else "—"
         send_telegram(
-            f"📈 *SIMULAZIONE — {azione} {sym}*\n"
+            f"📈 SIMULAZIONE — {azione} {sym}\n"
             f"Prezzo: ${fmt(price)} — investiti {fmt(amount)} {cfg['currency']}\n"
             f"Stop: {stop_s} / Obiettivo: {tgt_s}\n"
-            f"{pos['note']}\n\n_⚠️ Soldi finti. Non è consulenza finanziaria._"
+            f"{pos['note']}\n\n⚠️ Soldi finti. Non è consulenza finanziaria."
         )
         dirty = True
 
@@ -331,12 +331,12 @@ def main():
         wins = sum(1 for t in portfolio["closed_trades"] if t.get("pnl", 0) >= 0)
         losses = sum(1 for t in portfolio["closed_trades"] if t.get("pnl", 0) < 0)
         send_telegram(
-            f"📊 *SIMULAZIONE — Bilancio giornaliero*\n"
-            f"Capitale: {fmt(start)} → *{fmt(equity)}* {cfg['currency']} "
+            f"📊 SIMULAZIONE — Bilancio giornaliero\n"
+            f"Capitale: {fmt(start)} → {fmt(equity)} {cfg['currency']} "
             f"({'+' if chg >= 0 else ''}{fmt(chg)}, {'+' if chgpct >= 0 else ''}{chgpct:.1f}%)\n"
             f"Posizioni aperte: {len(portfolio['open_positions'])} · "
             f"Chiuse: {len(portfolio['closed_trades'])} (vinte {wins} / perse {losses})\n\n"
-            f"_⚠️ Soldi finti. Non è consulenza finanziaria._"
+            f"⚠️ Soldi finti. Non è consulenza finanziaria."
         )
         portfolio["last_summary_date"] = today
         dirty = True

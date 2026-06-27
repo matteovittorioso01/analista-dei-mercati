@@ -6,22 +6,8 @@
     "currency": "USD",
     "daily_summary_hour_utc": 19
   },
-  "cash": 900.0,
-  "open_positions": [
-    {
-      "symbol": "BTC",
-      "asset_class": "crypto",
-      "cg_id": "bitcoin",
-      "direction": "long",
-      "entry_price": 60342.0,
-      "amount": 100.0,
-      "qty": 0.0016572205097610288,
-      "stop": 57500,
-      "target": 64500,
-      "note": "Rimbalzo su annual low (+1.6%), RSI 30.7 ipervenduto. Non entrare se rompe $59k.",
-      "opened_at": "2026-06-27T10:10:36+00:00"
-    }
-  ],
+  "cash": 1000.0,
+  "open_positions": [],
   "closed_trades": [],
   "last_summary_date": ""
 }
