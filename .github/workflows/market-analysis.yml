@@ -42,7 +42,7 @@ jobs:
             Scrivi il report in:
             reports/${{ steps.slot.outputs.year }}/${{ steps.slot.outputs.date }}-${{ steps.slot.outputs.slot }}.md
             e aggiorna state/watchlist.json secondo lo schema indicato nel prompt.
-          claude_args: "--allowedTools WebSearch,WebFetch,Bash,Read,Write,Edit"
+          claude_args: "--model claude-sonnet-4-6 --allowedTools WebSearch,WebFetch,Bash,Read,Write,Edit"
 
       - name: Salva report e watchlist
         run: |
