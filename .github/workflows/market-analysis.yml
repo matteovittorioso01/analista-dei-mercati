@@ -1,0 +1,68 @@
+name: Market Analysis (Analista)
+
+# L'Analista (Claude) si sveglia 3 volte al giorno, legge le news dei mercati,
+# scrive un report completo e aggiorna la watchlist che la Sentinella sorveglia.
+# Il report viene inviato anche via email.
+
+on:
+  schedule:
+    - cron: "50 5 * * 1-5"   # ~07:50 ora italiana (CEST) — mattina
+    - cron: "0 12 * * 1-5"   # ~14:00 ora italiana (CEST) — pomeriggio
+    - cron: "30 19 * * 1-5"  # ~21:30 ora italiana (CEST) — sera
+  workflow_dispatch:         # permette anche il lancio manuale dalla tab Actions
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determina la fascia oraria (slot)
+        id: slot
+        run: |
+          H=$(date -u +%H)
+          if   [ "$H" -lt 10 ]; then echo "slot=mattina"    >> "$GITHUB_OUTPUT"
+          elif [ "$H" -lt 17 ]; then echo "slot=pomeriggio" >> "$GITHUB_OUTPUT"
+          else                       echo "slot=sera"        >> "$GITHUB_OUTPUT"; fi
+          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+          echo "year=$(date -u +%Y)"       >> "$GITHUB_OUTPUT"
+
+      # NOTA: gli input esatti di claude-code-action vanno verificati contro il
+      # README dell'action al momento del primo setup (prompt / claude_args).
+      - name: Esegui l'Analista (Claude)
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Leggi e applica integralmente le istruzioni in prompts/analyst.md.
+            Fascia oraria di questa esecuzione: ${{ steps.slot.outputs.slot }}.
+            Scrivi il report in:
+            reports/${{ steps.slot.outputs.year }}/${{ steps.slot.outputs.date }}-${{ steps.slot.outputs.slot }}.md
+            e aggiorna state/watchlist.json secondo lo schema indicato nel prompt.
+          claude_args: "--allowedTools WebSearch,WebFetch,Bash,Read,Write,Edit"
+
+      - name: Salva report e watchlist
+        run: |
+          git config user.name "market-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add reports state/watchlist.json
+          git commit -m "analista: report ${{ steps.slot.outputs.date }} ${{ steps.slot.outputs.slot }}" || echo "nulla da committare"
+          git push
+
+      - name: Invia il report via email
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_APP_PASSWORD }}
+          subject: "Analisi Mercati — ${{ steps.slot.outputs.date }} ${{ steps.slot.outputs.slot }}"
+          to: matteovittorioso@gmail.com
+          from: Market Bot
+          convert_markdown: true
+          html_body: file://reports/${{ steps.slot.outputs.year }}/${{ steps.slot.outputs.date }}-${{ steps.slot.outputs.slot }}.md

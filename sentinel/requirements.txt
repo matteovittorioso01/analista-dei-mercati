@@ -1,0 +1,2 @@
+# Nessuna dipendenza esterna.
+# check.py usa esclusivamente la libreria standard di Python (urllib, json, ...).
