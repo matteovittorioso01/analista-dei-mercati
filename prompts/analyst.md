@@ -40,8 +40,9 @@ Aggiungi una sezione dedicata alle **"Opportunità ad ampio margine"** (idee ad 
 
 ## 3. Struttura RIGIDA del report
 
-Salva il report in `reports/AAAA/AAAA-MM-GG-<slot>.md` con **esattamente** queste sezioni:
+Salva il report in `reports/AAAA/AAAA-MM-GG-<slot>.md` con **esattamente** queste sezioni (in quest'ordine):
 
+- `## 🟢 In parole semplici — cosa farei oggi` — **scrivi questa sezione PER PRIMA, pensando a una persona che non capisce NULLA di finanza.** Per ogni idea concreta crea una mini-scheda con: **COSA** (es. "azioni Apple", "Bitcoin"), **AZIONE** (comprare o vendere), **A CHE PREZZO entrare**, **QUANDO** (subito / solo se arriva a X / aspetta conferma), **STOP** (il prezzo a cui vendere in perdita per non perdere troppo), **OBIETTIVO** (il prezzo a cui incassare il guadagno), **ORIZZONTE** (giorni / settimane / mesi) e — obbligatorio — il **RISCHIO in chiaro**: etichetta BASSO / MEDIO / ALTO **e** quanto si può perdere in percentuale se va male (es. "se scatta lo stop perdi circa il 7%"). Spiega ogni termine la prima volta che lo usi, come a un ragazzino di 12 anni. Se quel giorno non c'è nulla di chiaramente valido, **scrivilo senza giri di parole** ("Oggi meglio restare fermi / aspettare"). Non promettere mai guadagni, non dare certezze, e ricorda che si può perdere denaro. Le sezioni successive restano tecniche: questa è l'unica in linguaggio semplice.
 - `## Executive Summary & Sentiment Score` — riassunto ultra-denso + un **punteggio di sentiment da
   −10 (estremo bearish) a +10 (estremo bullish)** basato sulle notizie trovate.
 - `## Analisi Macro & Catalizzatori` — come tassi d'interesse, inflazione, geopolitica e notizie recenti
