@@ -4,6 +4,8 @@
 - Controlla i prezzi della watchlist (Finnhub per azioni/forex, CoinGecko per crypto).
 - Gestisce un PORTAFOGLIO SIMULATO a soldi finti: apre/chiude posizioni seguendo
   entry zone / stop / target della watchlist, traccia cassa e profitti/perdite.
+- Applica lo STOP-LOSS DURO a -7% (rete di sicurezza, ogni 5 min).
+- Esegue gli ordini di RIBILANCIAMENTO lasciati dal Risk Manager (state/risk_orders.json).
 - Invia un messaggio Telegram per ogni operazione + un bilancio giornaliero.
 - Aggiorna state/portfolio.json (dati) e PORTFOLIO.md (vista leggibile).
 
@@ -21,6 +23,7 @@ import pathlib
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 WATCHLIST = ROOT / "state" / "watchlist.json"
 PORTFOLIO = ROOT / "state" / "portfolio.json"
+RISK_ORDERS = ROOT / "state" / "risk_orders.json"
 PORTFOLIO_MD = ROOT / "PORTFOLIO.md"
 
 FINNHUB_KEY = os.environ.get("MARKET_DATA_API_KEY", "")
@@ -34,6 +37,7 @@ DEFAULT_CONFIG = {
     "max_open_positions": 5,       # posizioni aperte contemporaneamente
     "currency": "USD",             # i prezzi delle API sono in dollari
     "daily_summary_hour_utc": 19,  # ~21:00 ora italiana (CEST)
+    "hard_stop_loss_pct": -7,      # rete di sicurezza: chiudi se sotto questa %
 }
 
 
@@ -70,8 +74,7 @@ def get_price(item):
 
 
 def send_telegram(text):
-    # Testo semplice (niente parse_mode): evita gli errori 400 di Telegram
-    # quando il testo contiene caratteri che la formattazione Markdown rifiuta.
+    # Testo semplice (niente parse_mode): evita gli errori 400 di Telegram.
     if not (TG_TOKEN and TG_CHAT):
         print("Telegram non configurato: salto invio.")
         return
@@ -108,6 +111,7 @@ def load_portfolio():
     p.setdefault("open_positions", [])
     p.setdefault("closed_trades", [])
     p.setdefault("last_summary_date", "")
+    p.setdefault("last_orders_stamp", "")
     return p
 
 
@@ -121,9 +125,14 @@ def entry_condition(item, price):
     return (price <= hi) if direction == "long" else (price >= lo)
 
 
-def exit_reason(pos, price):
-    """Restituisce 'stop' o 'obiettivo' se la posizione va chiusa, altrimenti None."""
+def exit_reason(pos, price, hard_stop_pct=-7):
+    """Restituisce il motivo di chiusura ('stop -7%', 'stop', 'obiettivo') o None."""
     direction = pos.get("direction", "long")
+    entry = pos.get("entry_price") or 0
+    sign = 1 if direction == "long" else -1
+    # Rete di sicurezza: perdita oltre la soglia -> chiudi comunque
+    if entry and sign * (price - entry) / entry * 100 <= hard_stop_pct:
+        return f"stop {hard_stop_pct}%"
     stop = pos.get("stop")
     target = pos.get("target")
     if stop is not None:
@@ -142,6 +151,76 @@ def pnl_for(pos, price):
         return 0.0
     sign = 1 if pos.get("direction", "long") == "long" else -1
     return sign * (price - entry) / entry * pos.get("amount", 0)
+
+
+def execute_risk_orders(portfolio, prices, cfg):
+    """Esegue gli ordini del Risk Manager (state/risk_orders.json).
+
+    v1: eseguiamo solo le VENDITE (controllo del rischio / diversificazione).
+    Gli acquisti restano gestiti dalle idee della watchlist. Restituisce True
+    se è cambiato qualcosa.
+    """
+    ro = load_json(RISK_ORDERS, {})
+    stamp = ro.get("updated_at", "")
+    if not stamp or portfolio.get("last_orders_stamp") == stamp:
+        return False  # nessun nuovo set di ordini
+
+    changed = False
+    by_sym = {p["symbol"]: p for p in portfolio["open_positions"]}
+    for o in ro.get("orders", []):
+        action = (o.get("action") or "").upper()
+        sym = o.get("ticker")
+        if action != "SELL" or sym not in by_sym:
+            continue
+        pos = by_sym[sym]
+        price = prices.get(sym)
+        if price is None:
+            continue
+        try:
+            frac = float(o.get("percentage_to_trade") or 1.0)
+        except (TypeError, ValueError):
+            frac = 1.0
+        if frac <= 0:
+            continue
+        frac = min(frac, 1.0)
+        entry = pos.get("entry_price") or price
+        sign = 1 if pos.get("direction", "long") == "long" else -1
+        sold_amount = pos.get("amount", 0) * frac
+        realized = sign * (price - entry) / entry * sold_amount
+        portfolio["cash"] += sold_amount + realized
+        pct = (realized / sold_amount * 100) if sold_amount else 0.0
+        totale = frac >= 0.999
+        portfolio["closed_trades"].append({
+            "symbol": sym,
+            "asset_class": pos.get("asset_class"),
+            "cg_id": pos.get("cg_id"),
+            "direction": pos.get("direction", "long"),
+            "entry_price": entry,
+            "amount": round(sold_amount, 2),
+            "exit_price": price,
+            "pnl": round(realized, 2),
+            "pnl_pct": round(pct, 2),
+            "reason": "ribilanciamento" + (" (totale)" if totale else " (parziale)"),
+            "closed_at": now_utc().isoformat(timespec="seconds"),
+        })
+        if totale:
+            portfolio["open_positions"] = [x for x in portfolio["open_positions"] if x["symbol"] != sym]
+            by_sym.pop(sym, None)
+        else:
+            pos["amount"] = round(pos.get("amount", 0) * (1 - frac), 2)
+            pos["qty"] = pos.get("qty", 0) * (1 - frac)
+        quanto = "tutto" if totale else f"{frac * 100:.0f}%"
+        send_telegram(
+            f"♻️ SIMULAZIONE — RIBILANCIAMENTO: venduto {quanto} di {sym}\n"
+            f"Prezzo: ${fmt(price)} — risultato {'+' if realized >= 0 else ''}{fmt(realized)} {cfg['currency']} "
+            f"({'+' if pct >= 0 else ''}{pct:.1f}%)\n"
+            f"Motivo: {o.get('reasoning', 'controllo rischio / diversificazione')}\n\n"
+            f"⚠️ Soldi finti. Non è consulenza finanziaria."
+        )
+        changed = True
+
+    portfolio["last_orders_stamp"] = stamp
+    return changed
 
 
 def write_portfolio_md(p, prices, equity, open_value):
@@ -213,6 +292,7 @@ def main():
     portfolio = load_portfolio()
     cfg = portfolio["config"]
     per_trade = cfg["starting_capital"] * cfg["max_per_trade_pct"] / 100.0
+    hard_stop = cfg.get("hard_stop_loss_pct", -7)
 
     items = wl.get("items", [])
 
@@ -236,16 +316,15 @@ def main():
         time.sleep(1.2)  # rispetta i rate limit delle API gratuite
 
     dirty = not existed  # alla primissima esecuzione crea i file
-    open_by_symbol = {p["symbol"]: p for p in portfolio["open_positions"]}
 
-    # 1) CHIUSURE — controlla le posizioni aperte (stop / obiettivo)
+    # 1) CHIUSURE — controlla le posizioni aperte (stop / obiettivo / stop-loss -7%)
     still_open = []
     for pos in portfolio["open_positions"]:
         price = prices.get(pos["symbol"])
         if price is None:
             still_open.append(pos)
             continue
-        reason = exit_reason(pos, price)
+        reason = exit_reason(pos, price, hard_stop)
         if not reason:
             still_open.append(pos)
             continue
@@ -272,6 +351,10 @@ def main():
         )
         dirty = True
     portfolio["open_positions"] = still_open
+
+    # 1b) RIBILANCIAMENTO — esegui gli ordini (solo vendite) del Risk Manager
+    if execute_risk_orders(portfolio, prices, cfg):
+        dirty = True
     open_by_symbol = {p["symbol"]: p for p in portfolio["open_positions"]}
 
     # 2) APERTURE — segnali d'ingresso dalla watchlist

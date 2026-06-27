@@ -87,7 +87,33 @@ Regole:
 - Per la **crypto** aggiungi il campo `"cg_id"` con l'id CoinGecko (es. `"cg_id": "bitcoin"`).
 - Mantieni la lista focalizzata (indicativamente ≤ 15 strumenti) per rispettare i limiti delle API.
 
-## 5. Tono e stile
+## 5. Risk Manager — controllo del portafoglio simulato (OBBLIGATORIO)
+
+Dopo aver aggiornato la watchlist, agisci come **Risk Officer** sul portafoglio simulato già esistente (soldi finti).
+
+1. **Leggi i dati certi**: esegui da shell `python risk/portfolio_report.py` e usa il suo output come **verità assoluta** (pesi %, esposizione per categoria, liquidità %, P/L%). **Non ricalcolare a mano.**
+2. **Applica queste REGOLE di diversificazione/rischio** (categorie = Crypto / Azioni / Materie prime / Valute):
+   - Nessun **singolo asset** oltre il **15%** del portafoglio: se supera ~18% per un rialzo, ordina una **vendita parziale** (take profit) per riportarlo sotto il 15%.
+   - Nessuna **categoria** oltre il **35%**: se superata, valuta di alleggerire l'asset più debole di quella categoria.
+   - **Liquidità** idealmente tra 10% e 20%.
+   - Default **HOLD**: agisci SOLO se c'è una chiara violazione delle regole. La stabilità è una virtù, non sovra-operare.
+   - Lo **stop-loss a −7%** è già applicato in automatico dalla Sentinella ogni 5 minuti: non te ne devi occupare.
+3. **Scrivi `state/risk_orders.json`** (sovrascrivi tutto il file) con lo schema sotto. `updated_at` = data-ora ISO-8601 UTC attuale (così la Sentinella esegue gli ordini nuovi). Vengono eseguite **solo le azioni SELL** (gli acquisti li gestiscono le idee della watchlist). `percentage_to_trade` per SELL = frazione della posizione da vendere (0–1; es. `0.5` = metà, `1` = tutta). Se è tutto in regola: `"orders": []` e `diversification_status: "OTTIMALE"`.
+
+```json
+{
+  "updated_at": "<ISO-8601 UTC>",
+  "strategy_analysis": {
+    "diversification_status": "OTTIMALE | SBILANCIATO | CRITICO",
+    "risk_notes": "Analisi sintetica di pesi percentuali e categorie."
+  },
+  "orders": [
+    {"action": "SELL", "ticker": "BTC", "percentage_to_trade": 0.5, "reasoning": "Crypto oltre il 35%: alleggerisco."}
+  ]
+}
+```
+
+## 6. Tono e stile
 
 Professionale, istituzionale, asciutto, privo di sensazionalismi. Evita espressioni generiche: ogni
 affermazione deve essere supportata da un dato, una metrica o una notizia specifica. Usa **tabelle
