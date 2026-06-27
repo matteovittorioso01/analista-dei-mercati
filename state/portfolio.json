@@ -4,9 +4,10 @@
     "max_per_trade_pct": 10,
     "max_open_positions": 5,
     "currency": "USD",
-    "daily_summary_hour_utc": 19
+    "daily_summary_hour_utc": 19,
+    "hard_stop_loss_pct": -7
   },
-  "cash": 900.0,
+  "cash": 800.0,
   "open_positions": [
     {
       "symbol": "BTC",
@@ -20,8 +21,22 @@
       "target": 64500,
       "note": "Rimbalzo su annual low (+1.6%), RSI 30.7 ipervenduto. Non entrare se rompe $59k.",
       "opened_at": "2026-06-27T10:25:58+00:00"
+    },
+    {
+      "symbol": "ETH",
+      "asset_class": "crypto",
+      "cg_id": "ethereum",
+      "direction": "long",
+      "entry_price": 1576.86,
+      "amount": 100.0,
+      "qty": 0.06341717083317479,
+      "stop": 1440,
+      "target": 1800,
+      "note": "Correlato BTC, -39.8% YTD. Catch-up trade se BTC rimbalza.",
+      "opened_at": "2026-06-27T19:55:36+00:00"
     }
   ],
   "closed_trades": [],
-  "last_summary_date": ""
+  "last_summary_date": "2026-06-27",
+  "last_orders_stamp": "2026-06-27T13:00:00Z"
 }
