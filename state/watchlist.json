@@ -1,4 +1,62 @@
 {
-  "updated_at": "",
-  "items": []
+  "updated_at": "2026-06-27T07:00:00Z",
+  "items": [
+    {
+      "symbol": "BTC",
+      "asset_class": "crypto",
+      "cg_id": "bitcoin",
+      "direction": "long",
+      "entry_zone": [59000, 60500],
+      "stop": 57500,
+      "targets": [64500, 68000],
+      "horizon": "swing",
+      "conviction": "bassa",
+      "note": "Rimbalzo su annual low (+1.6%), RSI 30.7 ipervenduto. Non entrare se rompe $59k."
+    },
+    {
+      "symbol": "ETH",
+      "asset_class": "crypto",
+      "cg_id": "ethereum",
+      "direction": "long",
+      "entry_zone": [1520, 1580],
+      "stop": 1440,
+      "targets": [1800, 2100],
+      "horizon": "swing",
+      "conviction": "bassa",
+      "note": "Correlato BTC, -39.7% YTD. Rimbalzo tecnico se BTC regge supporto."
+    },
+    {
+      "symbol": "XAUUSD",
+      "asset_class": "commodity",
+      "direction": "long",
+      "entry_zone": [3950, 4050],
+      "stop": 3800,
+      "targets": [4200, 4500],
+      "horizon": "medio",
+      "conviction": "media",
+      "note": "Pullback -5% su hawkish Fed (Warsh). Bull trend strutturale intatto. Supporto $3,900-4,000."
+    },
+    {
+      "symbol": "EURUSD",
+      "asset_class": "forex",
+      "direction": "short",
+      "entry_zone": [1.1350, 1.1420],
+      "stop": 1.1520,
+      "targets": [1.1200, 1.1050],
+      "horizon": "swing",
+      "conviction": "media",
+      "note": "Rottura ribassista supporto 1.1620 (18/06). USD forte su Fed hawkish + possibile rialzo tassi Q3 2026."
+    },
+    {
+      "symbol": "BRENT",
+      "asset_class": "commodity",
+      "direction": "short",
+      "entry_zone": [75, 78],
+      "stop": 81,
+      "targets": [70, 65],
+      "horizon": "medio",
+      "conviction": "bassa",
+      "note": "De-escalation Hormuz spinge verso fair value $65-70. Nuovo attacco Ever Lovely crea rumore ma trend è ribassista. Stop ampio per gestire spike geopolitici."
+    }
+  ]
 }
