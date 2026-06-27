@@ -1,0 +1,13 @@
+{
+  "config": {
+    "starting_capital": 1000.0,
+    "max_per_trade_pct": 10,
+    "max_open_positions": 5,
+    "currency": "USD",
+    "daily_summary_hour_utc": 19
+  },
+  "cash": 1000.0,
+  "open_positions": [],
+  "closed_trades": [],
+  "last_summary_date": ""
+}

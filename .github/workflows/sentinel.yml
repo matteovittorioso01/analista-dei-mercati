@@ -32,14 +32,14 @@ jobs:
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
         run: python sentinel/check.py
 
-      - name: Salva lo stato degli alert (solo se cambiato)
+      - name: Salva portafoglio simulato (solo se cambiato)
         env:
           GH_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! git diff --quiet -- state/fired.json; then
+          if ! git diff --quiet -- state/portfolio.json PORTFOLIO.md; then
             git config user.name "market-bot"
             git config user.email "bot@users.noreply.github.com"
-            git add state/fired.json
-            git commit -m "sentinel: aggiorna stato alert"
+            git add state/portfolio.json PORTFOLIO.md
+            git commit -m "sentinel: aggiorna portafoglio simulato"
             git push "https://x-access-token:${GH_PUSH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:main
           fi
