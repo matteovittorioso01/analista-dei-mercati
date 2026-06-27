@@ -1,8 +1,8 @@
 {
-  "updated_at": "",
+  "updated_at": "2026-06-27T13:00:00Z",
   "strategy_analysis": {
-    "diversification_status": "",
-    "risk_notes": ""
+    "diversification_status": "OTTIMALE",
+    "risk_notes": "Portafoglio: $999.86 totale. BTC 10.0% (sotto limite 15%), Crypto 10.0% (sotto limite 35%), Cash 90.0% (sopra target 10-20% ma strategicamente corretto in contesto bearish: sentiment -5/10, Fed hawkish, selloff AI/tech, crypto ai minimi). Nessuna violazione delle regole di diversificazione che richieda azione. La liquidità elevata preserva capacità di entrata scalata sulle opportunità identificate nella watchlist."
   },
   "orders": []
 }

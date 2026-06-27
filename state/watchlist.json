@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-06-27T07:00:00Z",
+  "updated_at": "2026-06-27T13:00:00Z",
   "items": [
     {
       "symbol": "BTC",
@@ -11,7 +11,7 @@
       "targets": [64500, 68000],
       "horizon": "swing",
       "conviction": "bassa",
-      "note": "Rimbalzo su annual low (+1.6%), RSI 30.7 ipervenduto. Non entrare se rompe $59k."
+      "note": "Annual low +1.1%, RSI ~31.5 ipervenduto. Non entrare se rompe $59.130."
     },
     {
       "symbol": "ETH",
@@ -23,18 +23,18 @@
       "targets": [1800, 2100],
       "horizon": "swing",
       "conviction": "bassa",
-      "note": "Correlato BTC, -39.7% YTD. Rimbalzo tecnico se BTC regge supporto."
+      "note": "Correlato BTC, -39.8% YTD. Catch-up trade se BTC rimbalza."
     },
     {
       "symbol": "XAUUSD",
       "asset_class": "commodity",
       "direction": "long",
-      "entry_zone": [3950, 4050],
+      "entry_zone": [3950, 4071],
       "stop": 3800,
       "targets": [4200, 4500],
       "horizon": "medio",
       "conviction": "media",
-      "note": "Pullback -5% su hawkish Fed (Warsh). Bull trend strutturale intatto. Supporto $3,900-4,000."
+      "note": "Oggi a $4.071 (+0.27%) — già in zona entrata. Bull trend strutturale intatto nonostante pressione hawkish Fed."
     },
     {
       "symbol": "EURUSD",
@@ -45,18 +45,18 @@
       "targets": [1.1200, 1.1050],
       "horizon": "swing",
       "conviction": "media",
-      "note": "Rottura ribassista supporto 1.1620 (18/06). USD forte su Fed hawkish + possibile rialzo tassi Q3 2026."
+      "note": "USD forte su Fed hawkish (Warsh). EUR rimbalzo tecnico da 1.1324 a 1.1400: buona zona di entrata short. R/R T2: 2.48x."
     },
     {
       "symbol": "BRENT",
       "asset_class": "commodity",
       "direction": "short",
-      "entry_zone": [75, 78],
+      "entry_zone": [71, 73],
       "stop": 81,
       "targets": [70, 65],
       "horizon": "medio",
       "conviction": "bassa",
-      "note": "De-escalation Hormuz spinge verso fair value $65-70. Nuovo attacco Ever Lovely crea rumore ma trend è ribassista. Stop ampio per gestire spike geopolitici."
+      "note": "Prezzo già sceso a $71.5 — vicino a T1 ($70). De-escalation Hormuz spinge verso $65. Non aprire nuove posizioni short qui: R/R non più favorevole. Monitorare chiusura T1."
     }
   ]
 }
