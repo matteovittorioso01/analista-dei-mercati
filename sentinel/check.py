@@ -25,6 +25,7 @@ WATCHLIST = ROOT / "state" / "watchlist.json"
 PORTFOLIO = ROOT / "state" / "portfolio.json"
 RISK_ORDERS = ROOT / "state" / "risk_orders.json"
 PORTFOLIO_MD = ROOT / "PORTFOLIO.md"
+EQUITY_HISTORY = ROOT / "state" / "equity_history.csv"
 
 FINNHUB_KEY = os.environ.get("MARKET_DATA_API_KEY", "")
 TG_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
@@ -41,6 +42,9 @@ DEFAULT_CONFIG = {
     "currency": "USD",                 # i prezzi delle API sono in dollari
     "daily_summary_hour_utc": 19,      # ~21:00 ora italiana (CEST)
     "hard_stop_loss_pct": -7,          # rete di sicurezza: chiudi se sotto questa %
+    "round_trip_cost_pct": 0.2,        # costi realistici (commissioni+spread) per operazione completa
+    "max_drawdown_pct": -20,           # circuit breaker: sospendi NUOVE aperture se il capitale
+                                       # scende oltre questa % sotto il massimo storico (picco)
 }
 
 # Le "categorie" raggruppano gli asset per il controllo di diversificazione.
@@ -156,7 +160,34 @@ def load_portfolio():
     p.setdefault("closed_trades", [])
     p.setdefault("last_summary_date", "")
     p.setdefault("last_orders_stamp", "")
+    p.setdefault("peak_equity", p["config"]["starting_capital"])  # max storico, per il drawdown
+    p.setdefault("last_breaker_alert_date", "")
     return p
+
+
+def round_trip_cost(amount, cfg):
+    """Costo di transazione (commissioni + spread) su una chiusura, in valuta.
+
+    Modellato come una % dell'importo movimentato e addebitato alla chiusura.
+    Approssimazione onesta per non illudersi con un paper trading "a costo zero":
+    moltissime strategie redditizie sulla carta diventano in perdita coi costi reali.
+    """
+    return abs(amount) * cfg.get("round_trip_cost_pct", 0.0) / 100.0
+
+
+def append_equity_point(equity, cash, open_value, n_open, n_closed):
+    """Aggiunge una riga giornaliera allo storico del capitale (curva equity).
+
+    Serve a misurare nel tempo rendimento, volatilità e drawdown (vedi
+    risk/performance.py). Una riga al giorno, formato CSV semplice.
+    """
+    new = not EQUITY_HISTORY.exists()
+    row = (f"{now_utc().strftime('%Y-%m-%d')},{equity:.2f},{cash:.2f},"
+           f"{open_value:.2f},{n_open},{n_closed}\n")
+    with EQUITY_HISTORY.open("a", encoding="utf-8") as f:
+        if new:
+            f.write("date,equity,cash,open_value,n_open,n_closed\n")
+        f.write(row)
 
 
 def entry_condition(item, price):
@@ -231,6 +262,7 @@ def execute_risk_orders(portfolio, prices, cfg):
         sign = 1 if pos.get("direction", "long") == "long" else -1
         sold_amount = pos.get("amount", 0) * frac
         realized = sign * (price - entry) / entry * sold_amount
+        realized -= round_trip_cost(sold_amount, cfg)  # costi reali di transazione
         portfolio["cash"] += sold_amount + realized
         pct = (realized / sold_amount * 100) if sold_amount else 0.0
         totale = frac >= 0.999
@@ -373,6 +405,7 @@ def main():
             still_open.append(pos)
             continue
         realized = pnl_for(pos, price)
+        realized -= round_trip_cost(pos.get("amount", 0), cfg)  # costi reali di transazione
         portfolio["cash"] += pos.get("amount", 0) + realized
         pct = (realized / pos["amount"] * 100.0) if pos.get("amount") else 0.0
         closed = dict(pos)
@@ -417,8 +450,33 @@ def main():
         cat_count[c] = cat_count.get(c, 0) + 1
     equity_now = portfolio["cash"] + open_market_value
 
+    # CIRCUIT BREAKER — aggiorna il picco storico e calcola il drawdown attuale.
+    # Se il capitale è sceso oltre la soglia sotto il picco, sospendiamo le NUOVE
+    # aperture (le posizioni in essere restano gestite da stop/target). È la rete
+    # che impedisce di "raddoppiare nel buco" durante una serie negativa.
+    peak = max(portfolio.get("peak_equity", cfg["starting_capital"]), equity_now)
+    portfolio["peak_equity"] = peak
+    dd_pct = (equity_now - peak) / peak * 100.0 if peak else 0.0
+    max_dd = cfg.get("max_drawdown_pct", -100)
+    entries_halted = dd_pct <= max_dd
+    if entries_halted:
+        print(f"CIRCUIT BREAKER attivo: drawdown {dd_pct:.1f}% <= {max_dd}% — nuove aperture sospese")
+        today_str = now_utc().strftime("%Y-%m-%d")
+        if portfolio.get("last_breaker_alert_date") != today_str:
+            send_telegram(
+                f"🛑 SIMULAZIONE — CIRCUIT BREAKER attivo\n"
+                f"Capitale sceso del {dd_pct:.1f}% dal massimo (soglia {max_dd}%).\n"
+                f"Sospendo le NUOVE aperture finché non si recupera. Le posizioni aperte "
+                f"restano gestite da stop e obiettivo.\n\n"
+                f"⚠️ Soldi finti. Non è consulenza finanziaria."
+            )
+            portfolio["last_breaker_alert_date"] = today_str
+            dirty = True
+
     # 2) APERTURE — segnali d'ingresso dalla watchlist
     for it in items:
+        if entries_halted:
+            break  # circuit breaker: nessuna nuova apertura
         sym = it["symbol"]
         price = prices.get(sym)
         if price is None or sym in open_by_symbol:
@@ -485,10 +543,16 @@ def main():
         chgpct = (chg / start * 100.0) if start else 0.0
         wins = sum(1 for t in portfolio["closed_trades"] if t.get("pnl", 0) >= 0)
         losses = sum(1 for t in portfolio["closed_trades"] if t.get("pnl", 0) < 0)
+        peak = max(portfolio.get("peak_equity", start), equity)
+        portfolio["peak_equity"] = peak
+        dd = (equity - peak) / peak * 100.0 if peak else 0.0
+        append_equity_point(equity, portfolio["cash"], open_value,
+                            len(portfolio["open_positions"]), len(portfolio["closed_trades"]))
         send_telegram(
             f"📊 SIMULAZIONE — Bilancio giornaliero\n"
             f"Capitale: {fmt(start)} → {fmt(equity)} {cfg['currency']} "
             f"({'+' if chg >= 0 else ''}{fmt(chg)}, {'+' if chgpct >= 0 else ''}{chgpct:.1f}%)\n"
+            f"Drawdown dal massimo: {dd:.1f}%\n"
             f"Posizioni aperte: {len(portfolio['open_positions'])} · "
             f"Chiuse: {len(portfolio['closed_trades'])} (vinte {wins} / perse {losses})\n\n"
             f"⚠️ Soldi finti. Non è consulenza finanziaria."

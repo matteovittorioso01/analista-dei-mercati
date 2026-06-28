@@ -68,10 +68,16 @@ stessa strada → Enable.
 | `.github/workflows/market-analysis.yml` | Programma l'Analista 3 volte al giorno |
 | `.github/workflows/sentinel.yml` | Programma la Sentinella ogni 5 minuti |
 | `prompts/analyst.md` | Le istruzioni ("il cervello") dell'Analista |
-| `sentinel/check.py` | Il programmino che controlla i prezzi e manda gli alert Telegram |
+| `sentinel/check.py` | Il programmino che controlla i prezzi, gestisce il portafoglio simulato e manda gli alert Telegram |
+| `risk/portfolio_report.py` | Snapshot deterministico del portafoglio (pesi, categorie) per il Risk Manager |
+| `risk/performance.py` | **Cruscotto metriche**: Sharpe, drawdown, win rate, profit factor (`python risk/performance.py`) |
+| `backtest/engine.py` | **Motore di backtest**: testa strategie a regole sul passato vs buy & hold (`python backtest/engine.py --help`) |
 | `state/watchlist.json` | La lista dei prezzi da sorvegliare (la scrive l'Analista) |
+| `state/portfolio.json` | Stato del portafoglio simulato (posizioni, cassa, operazioni chiuse) |
+| `state/equity_history.csv` | Storico giornaliero del capitale (curva equity, per le metriche) |
 | `state/fired.json` | Memoria degli alert già inviati (per non ripeterli) |
 | `reports/` | L'archivio di tutti i report, giorno per giorno |
+| **`GO-LIVE.md`** | **Da leggere prima di usare soldi veri**: checklist, dimensionamento del rischio, spese utili |
 
 - **Dove gira:** GitHub Actions (cloud). Funziona anche col tuo PC spento.
 - **Costi:** le email e gli alert sono gratis; l'Analista consuma un po' di credito della tua chiave
