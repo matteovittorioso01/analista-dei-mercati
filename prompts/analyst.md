@@ -84,7 +84,14 @@ chiari, così la Sentinella può sorvegliarle. Schema:
 Regole:
 - Imposta `updated_at` all'ora UTC corrente (così la Sentinella azzera i vecchi alert).
 - Inserisci **solo** idee con livelli numerici concreti; lascia fuori quelle puramente qualitative.
-- Per la **crypto** aggiungi il campo `"cg_id"` con l'id CoinGecko (es. `"cg_id": "bitcoin"`).
+- **Usa solo strumenti che la Sentinella sa prezzare** (altrimenti l'idea non verrà mai eseguita nella simulazione). Le fonti prezzi sono:
+  - **`crypto`** → CoinGecko: aggiungi sempre `"cg_id"` (es. `"cg_id": "bitcoin"`).
+  - **`forex`** → Frankfurter (tassi BCE, solo valute principali, aggiornati ~1 volta al giorno): `symbol` in **6 lettere BASEQUOTE** (es. `EURUSD`, `USDJPY`, `GBPUSD`); i livelli sono il cambio (es. `1.1400`).
+  - **`us_stock` / `eu_stock` / `commodity`** → Finnhub, che sul piano gratuito prezza **azioni ed ETF quotati negli USA**. Per indici e materie prime usa quindi **ETF proxy** con i livelli nella scala dell'ETF, **non** i simboli spot (che non vengono prezzati):
+    - Oro → `GLD` · Argento → `SLV` · Petrolio → `USO` (o `BNO` per il Brent)
+    - S&P 500 → `SPY` · Nasdaq 100 → `QQQ` · Russell 2000 → `IWM` · Azionario Italia → `EWI` · Europa → `VGK`
+    - Evita simboli non prezzabili come `XAUUSD`, `BRENT`, `SPX`: sostituiscili sempre con l'ETF corrispondente.
+- **Evita doppioni correlati**: non inserire due strumenti che si muovono quasi insieme (es. BTC ed ETH, oppure SPY e QQQ) come due idee piene separate. Scegli il più convincente, oppure segnalalo nella `note` così che il rischio non venga raddoppiato.
 - Mantieni la lista focalizzata (indicativamente ≤ 15 strumenti) per rispettare i limiti delle API.
 
 ## 5. Risk Manager — controllo del portafoglio simulato (OBBLIGATORIO)
@@ -95,9 +102,11 @@ Dopo aver aggiornato la watchlist, agisci come **Risk Officer** sul portafoglio 
 2. **Applica queste REGOLE di diversificazione/rischio** (categorie = Crypto / Azioni / Materie prime / Valute):
    - Nessun **singolo asset** oltre il **15%** del portafoglio: se supera ~18% per un rialzo, ordina una **vendita parziale** (take profit) per riportarlo sotto il 15%.
    - Nessuna **categoria** oltre il **35%**: se superata, valuta di alleggerire l'asset più debole di quella categoria.
+   - **Correlazione**: i pesi % non bastano. Se due posizioni sono fortemente correlate (es. BTC ed ETH, oro e argento, due indici azionari), trattale come **un unico blocco di rischio**: valuta la loro esposizione *sommata* contro i limiti qui sopra e, se concentrata, alleggerisci la più debole. Due asset correlati al 10% ciascuno equivalgono di fatto a una singola scommessa al 20%.
    - **Liquidità** idealmente tra 10% e 20%.
    - Default **HOLD**: agisci SOLO se c'è una chiara violazione delle regole. La stabilità è una virtù, non sovra-operare.
    - Lo **stop-loss a −7%** è già applicato in automatico dalla Sentinella ogni 5 minuti: non te ne devi occupare.
+   - Nota: la Sentinella applica già da sola un **freno anti-concentrazione in ingresso** (di default max 1 posizione per categoria e categoria ≤ 35%), quindi nuove aperture troppo sbilanciate vengono bloccate a monte. Il tuo compito qui è il take-profit/alleggerimento sulle posizioni **già aperte**.
 3. **Scrivi `state/risk_orders.json`** (sovrascrivi tutto il file) con lo schema sotto. `updated_at` = data-ora ISO-8601 UTC attuale (così la Sentinella esegue gli ordini nuovi). Vengono eseguite **solo le azioni SELL** (gli acquisti li gestiscono le idee della watchlist). `percentage_to_trade` per SELL = frazione della posizione da vendere (0–1; es. `0.5` = metà, `1` = tutta). Se è tutto in regola: `"orders": []` e `diversification_status: "OTTIMALE"`.
 
 ```json

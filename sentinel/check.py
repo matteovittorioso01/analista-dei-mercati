@@ -32,13 +32,30 @@ TG_CHAT = os.environ.get("TELEGRAM_CHAT_ID", "")
 
 # --- Regole della simulazione (concordate con l'utente) ---
 DEFAULT_CONFIG = {
-    "starting_capital": 1000.0,    # capitale finto iniziale (USD)
-    "max_per_trade_pct": 10,       # max % del capitale iniziale per operazione
-    "max_open_positions": 5,       # posizioni aperte contemporaneamente
-    "currency": "USD",             # i prezzi delle API sono in dollari
-    "daily_summary_hour_utc": 19,  # ~21:00 ora italiana (CEST)
-    "hard_stop_loss_pct": -7,      # rete di sicurezza: chiudi se sotto questa %
+    "starting_capital": 1000.0,        # capitale finto iniziale (USD)
+    "max_per_trade_pct": 10,           # max % del capitale iniziale per operazione
+    "max_open_positions": 5,           # posizioni aperte contemporaneamente
+    "max_positions_per_category": 1,   # anti-concentrazione: max posizioni nella stessa categoria
+                                       # (1 = una sola per Crypto/Azioni/Materie prime/Valute -> spread tra asset class)
+    "max_per_category_pct": 35,        # anti-concentrazione: max % del portafoglio per categoria
+    "currency": "USD",                 # i prezzi delle API sono in dollari
+    "daily_summary_hour_utc": 19,      # ~21:00 ora italiana (CEST)
+    "hard_stop_loss_pct": -7,          # rete di sicurezza: chiudi se sotto questa %
 }
+
+# Le "categorie" raggruppano gli asset per il controllo di diversificazione.
+# Tenere allineata a quella di risk/portfolio_report.py.
+CATEGORIE = {
+    "crypto": "Crypto",
+    "us_stock": "Azioni",
+    "eu_stock": "Azioni",
+    "commodity": "Materie prime",
+    "forex": "Valute",
+}
+
+
+def category_of(asset_class):
+    return CATEGORIE.get(asset_class, "Altro")
 
 
 def now_utc():
@@ -51,7 +68,12 @@ def http_get_json(url):
 
 
 def price_finnhub(symbol):
-    """Prezzo azioni USA / forex via Finnhub (richiede MARKET_DATA_API_KEY)."""
+    """Prezzo azioni USA ed ETF (anche proxy di indici/materie prime) via Finnhub.
+
+    Richiede MARKET_DATA_API_KEY. Sul piano gratuito Finnhub copre azioni/ETF
+    quotati negli USA: per oro/petrolio/indici usare ETF proxy (es. GLD, USO,
+    SPY, QQQ), non i simboli spot (XAUUSD, BRENT) che non vengono prezzati.
+    """
     if not FINNHUB_KEY:
         return None
     url = f"https://finnhub.io/api/v1/quote?symbol={urllib.parse.quote(symbol)}&token={FINNHUB_KEY}"
@@ -67,9 +89,31 @@ def price_coingecko(cg_id):
     return float(v) if v else None
 
 
+def price_frankfurter(symbol):
+    """Cambio forex spot via Frankfurter (dati BCE, gratis, senza chiave).
+
+    `symbol` = 6 lettere BASEQUOTE, es. 'EURUSD' o 'USDJPY'. Restituisce quante
+    unita' di QUOTE vale 1 unita' di BASE. Nota: i tassi BCE si aggiornano una
+    volta al giorno nei giorni feriali (adatto a trade swing, non intraday) e
+    coprono solo le valute principali pubblicate dalla BCE.
+    """
+    s = (symbol or "").upper().replace("/", "")
+    if len(s) != 6:
+        return None
+    base, quote = s[:3], s[3:]
+    url = f"https://api.frankfurter.app/latest?from={urllib.parse.quote(base)}&to={urllib.parse.quote(quote)}"
+    d = http_get_json(url)
+    v = d.get("rates", {}).get(quote)
+    return float(v) if v else None
+
+
 def get_price(item):
-    if item.get("asset_class") == "crypto":
+    ac = item.get("asset_class")
+    if ac == "crypto":
         return price_coingecko(item.get("cg_id") or item["symbol"].lower())
+    if ac == "forex":
+        return price_frankfurter(item["symbol"])
+    # us_stock / eu_stock / commodity -> ticker quotabile su Finnhub (ETF proxy)
     return price_finnhub(item["symbol"])
 
 
@@ -357,6 +401,22 @@ def main():
         dirty = True
     open_by_symbol = {p["symbol"]: p for p in portfolio["open_positions"]}
 
+    # Esposizione corrente per categoria (valore di mercato e numero di posizioni)
+    # e patrimonio stimato: servono al freno anti-concentrazione qui sotto.
+    # Aprire a mercato non cambia il patrimonio (sposta cassa -> posizione), quindi
+    # equity_now resta una base valida per tutto il loop di apertura.
+    max_cat_n = cfg.get("max_positions_per_category", 1)
+    max_cat_pct = cfg.get("max_per_category_pct", 35)
+    cat_value, cat_count, open_market_value = {}, {}, 0.0
+    for pos in portfolio["open_positions"]:
+        pr = prices.get(pos["symbol"])
+        val = pos.get("amount", 0) + (pnl_for(pos, pr) if pr is not None else 0.0)
+        open_market_value += val
+        c = category_of(pos.get("asset_class"))
+        cat_value[c] = cat_value.get(c, 0.0) + val
+        cat_count[c] = cat_count.get(c, 0) + 1
+    equity_now = portfolio["cash"] + open_market_value
+
     # 2) APERTURE — segnali d'ingresso dalla watchlist
     for it in items:
         sym = it["symbol"]
@@ -369,6 +429,16 @@ def main():
             continue  # portafoglio pieno
         if portfolio["cash"] < per_trade:
             continue  # cassa insufficiente
+        # Freno anti-concentrazione: non aprire se la categoria è già piena o se
+        # l'ingresso la porterebbe oltre il tetto di peso (es. due crypto correlate).
+        cat = category_of(it.get("asset_class"))
+        projected_pct = (cat_value.get(cat, 0.0) + per_trade) / equity_now * 100.0 if equity_now else 0.0
+        if cat_count.get(cat, 0) >= max_cat_n:
+            print(f"salto {sym}: categoria {cat} gia' al limite di posizioni ({cat_count.get(cat, 0)}/{max_cat_n})")
+            continue
+        if projected_pct > max_cat_pct:
+            print(f"salto {sym}: categoria {cat} supererebbe il tetto di peso ({projected_pct:.0f}% > {max_cat_pct}%)")
+            continue
         amount = per_trade
         targets = it.get("targets") or []
         pos = {
@@ -387,6 +457,8 @@ def main():
         portfolio["open_positions"].append(pos)
         open_by_symbol[sym] = pos
         portfolio["cash"] -= amount
+        cat_value[cat] = cat_value.get(cat, 0.0) + amount
+        cat_count[cat] = cat_count.get(cat, 0) + 1
         azione = "COMPRATO" if pos["direction"] == "long" else "VENDUTO ALLO SCOPERTO"
         stop_s = f"${fmt(pos['stop'])}" if pos["stop"] is not None else "—"
         tgt_s = f"${fmt(pos['target'])}" if pos["target"] is not None else "—"
