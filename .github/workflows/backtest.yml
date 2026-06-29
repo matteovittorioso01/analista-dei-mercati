@@ -1,8 +1,10 @@
 name: Backtest paniere (manuale)
 
-# Si lancia A MANO dalla tab "Actions" (non è programmato): scarica anni di storia
-# per un paniere diversificato, prova le strategie a regole, e ti manda via email
-# il report che dice se battono il semplice "compra e tieni". Numeri veri, zero codice.
+# Si lancia A MANO dalla tab "Actions" (non è programmato). Scarica anni di storia e
+# produce DUE report, inviati via email:
+#   1) confronto tra panieri diversificati (buy & hold) — rischio/rendimento
+#   2) strategie a regole vs comprare e tenere — hanno un vantaggio?
+# Numeri veri, zero codice da scrivere.
 
 on:
   workflow_dispatch:
@@ -20,10 +22,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Esegui il backtest del paniere
+      - name: Esegui il backtest delle strategie a regole
         run: python backtest/run_basket.py
 
-      - name: Salva il report nel repository
+      - name: Esegui il confronto dei panieri diversificati
+        run: python backtest/portfolio.py
+
+      - name: Salva i report nel repository
         env:
           GH_PUSH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -35,7 +40,7 @@ jobs:
             git push "https://x-access-token:${GH_PUSH_TOKEN}@github.com/${{ github.repository }}.git" HEAD:${{ github.ref_name }}
           fi
 
-      - name: Invia il report via email
+      - name: Invia via email il confronto dei panieri diversificati
         if: success()
         uses: dawidd6/action-send-mail@v3
         with:
@@ -44,7 +49,22 @@ jobs:
           secure: true
           username: ${{ secrets.MAIL_USERNAME }}
           password: ${{ secrets.MAIL_APP_PASSWORD }}
-          subject: "Backtest paniere — strategie a regole"
+          subject: "Panieri diversificati — confronto storico"
+          to: matteovittorioso@gmail.com
+          from: Market Bot
+          convert_markdown: true
+          html_body: file://backtest/results/portfolio.md
+
+      - name: Invia via email il backtest delle strategie a regole
+        if: success()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          secure: true
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_APP_PASSWORD }}
+          subject: "Backtest — strategie a regole vs comprare e tenere"
           to: matteovittorioso@gmail.com
           from: Market Bot
           convert_markdown: true
