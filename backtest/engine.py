@@ -55,11 +55,46 @@ def load_stooq(symbol):
 
 
 def load_coingecko(cg_id, days):
-    """Prezzi giornalieri crypto da CoinGecko (gratis)."""
+    """Prezzi giornalieri crypto da CoinGecko (gratis).
+
+    Nota: niente parametro `interval` (ora richiede un piano a pagamento e dà 401
+    sul piano free). Con days>90 CoinGecko restituisce comunque dati giornalieri.
+    """
     url = (f"https://api.coingecko.com/api/v3/coins/{urllib.parse.quote(cg_id)}"
-           f"/market_chart?vs_currency=usd&days={int(days)}&interval=daily")
+           f"/market_chart?vs_currency=usd&days={int(days)}")
     d = json.loads(http_get(url))
     return [(str(int(ts)), float(px)) for ts, px in d.get("prices", [])]
+
+
+def parse_yahoo(payload):
+    """Estrae (timestamp, prezzo) dalla risposta JSON del chart di Yahoo Finance.
+    Separata da load_yahoo così è testabile senza rete. Usa il prezzo rettificato
+    (adjclose) se disponibile, altrimenti la chiusura."""
+    res = (payload.get("chart", {}) or {}).get("result")
+    if not res:
+        return []
+    r0 = res[0]
+    ts = r0.get("timestamp") or []
+    ind = r0.get("indicators", {}) or {}
+    closes = None
+    adj = ind.get("adjclose")
+    if adj and adj[0].get("adjclose"):
+        closes = adj[0]["adjclose"]
+    elif ind.get("quote") and ind["quote"][0].get("close"):
+        closes = ind["quote"][0]["close"]
+    out = []
+    for t, c in zip(ts, closes or []):
+        if c is not None:
+            out.append((str(int(t)), float(c)))
+    return out
+
+
+def load_yahoo(symbol, range_="3y", interval="1d"):
+    """Prezzi giornalieri da Yahoo Finance (gratis, senza chiave, funziona dagli
+    IP cloud). Copre azioni/ETF (SPY), crypto (BTC-USD) e forex (EURUSD=X)."""
+    url = (f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(symbol)}"
+           f"?range={range_}&interval={interval}")
+    return parse_yahoo(json.loads(http_get(url)))
 
 
 def load_csv(path):
@@ -211,8 +246,8 @@ def fmt_metrics(name, m):
 
 def main():
     ap = argparse.ArgumentParser(description="Backtest strategie a regole (soldi finti).")
-    ap.add_argument("--source", choices=["stooq", "coingecko", "csv"], required=True)
-    ap.add_argument("--symbol", help="ticker Stooq (es. spy.us) o id CoinGecko (es. bitcoin)")
+    ap.add_argument("--source", choices=["yahoo", "stooq", "coingecko", "csv"], required=True)
+    ap.add_argument("--symbol", help="ticker Yahoo (es. SPY, BTC-USD, EURUSD=X), Stooq o id CoinGecko")
     ap.add_argument("--file", help="percorso CSV (con --source csv)")
     ap.add_argument("--days", type=int, default=730, help="giorni storici per CoinGecko")
     ap.add_argument("--strategy", choices=list(STRATEGIES), default="sma")
@@ -221,7 +256,9 @@ def main():
     ap.add_argument("--cost", type=float, default=0.1, help="costo per operazione, %% (default 0.1)")
     args = ap.parse_args()
 
-    if args.source == "stooq":
+    if args.source == "yahoo":
+        prices = load_yahoo(args.symbol)
+    elif args.source == "stooq":
         prices = load_stooq(args.symbol)
     elif args.source == "coingecko":
         prices = load_coingecko(args.symbol, args.days)

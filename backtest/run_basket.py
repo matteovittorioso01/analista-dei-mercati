@@ -27,20 +27,23 @@ RESULTS = ROOT / "backtest" / "results"
 COST = 0.1  # % per operazione (commissioni + spread, lato singolo)
 
 # Paniere volutamente diversificato: famiglie che non si muovono tutte insieme.
+# Fonte Yahoo Finance: gratis, senza chiave, funziona dagli IP di GitHub Actions.
 BASKET = [
-    {"name": "S&P 500 (SPY)",   "source": "stooq",     "symbol": "spy.us"},
-    {"name": "Nasdaq 100 (QQQ)", "source": "stooq",    "symbol": "qqq.us"},
-    {"name": "Oro (GLD)",       "source": "stooq",     "symbol": "gld.us"},
-    {"name": "Bond USA (TLT)",  "source": "stooq",     "symbol": "tlt.us"},
-    {"name": "Bitcoin",         "source": "coingecko", "symbol": "bitcoin"},
-    {"name": "Ethereum",        "source": "coingecko", "symbol": "ethereum"},
-    {"name": "EUR/USD",         "source": "stooq",     "symbol": "eurusd"},
+    {"name": "S&P 500 (SPY)",    "source": "yahoo", "symbol": "SPY"},
+    {"name": "Nasdaq 100 (QQQ)", "source": "yahoo", "symbol": "QQQ"},
+    {"name": "Oro (GLD)",        "source": "yahoo", "symbol": "GLD"},
+    {"name": "Bond USA (TLT)",   "source": "yahoo", "symbol": "TLT"},
+    {"name": "Bitcoin",          "source": "yahoo", "symbol": "BTC-USD"},
+    {"name": "Ethereum",         "source": "yahoo", "symbol": "ETH-USD"},
+    {"name": "EUR/USD",          "source": "yahoo", "symbol": "EURUSD=X"},
 ]
 
 STRATEGIES = ["sma", "rsi", "breakout"]
 
 
 def fetch(asset, days=1095):
+    if asset["source"] == "yahoo":
+        return engine.load_yahoo(asset["symbol"])
     if asset["source"] == "stooq":
         return engine.load_stooq(asset["symbol"])
     if asset["source"] == "coingecko":
