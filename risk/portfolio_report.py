@@ -45,6 +45,18 @@ def get_price(pos):
             )
             v = d.get(cg, {}).get("usd")
             return float(v) if v else None
+        if ac == "forex":
+            # Cambio spot via Frankfurter (BCE, gratis). sym = 6 lettere BASEQUOTE.
+            s = (sym or "").upper().replace("/", "")
+            if len(s) != 6:
+                return None
+            base, quote = s[:3], s[3:]
+            d = http_get_json(
+                f"https://api.frankfurter.app/latest?from={urllib.parse.quote(base)}&to={urllib.parse.quote(quote)}"
+            )
+            v = d.get("rates", {}).get(quote)
+            return float(v) if v else None
+        # us_stock / eu_stock / commodity -> ticker quotabile su Finnhub (ETF proxy)
         if not FINNHUB_KEY:
             return None
         d = http_get_json(
